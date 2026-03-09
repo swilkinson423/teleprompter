@@ -10,7 +10,7 @@ This project proposes a teleprompter web app that follows a script in real time 
 
 1. User pastes text into the application.
 2. Script parser converts text into paragraphs, sentences, and tokens.
-3. User starts a session.
+3. User clicks the microphone button to begin recording.
 4. Microphone audio begins streaming to the backend.
 5. Backend forwards audio to the speech provider.
 6. Transcript events stream back to the client.
@@ -22,8 +22,9 @@ This project proposes a teleprompter web app that follows a script in real time 
 ### User Interface
 
 - The teleprompter keeps the current sentence slightly above the center of the screen to guide the reader.
-- Words are highlighted as they are spoken.
-- Completed sentences fade to grey while upcoming sentences remain visible.
+- The active sentence is determined by the position of the next upcoming word, so highlighting leads slightly ahead of what has been spoken rather than lagging behind.
+- Within the active sentence, the next three words are shown in bold and highlighted to draw the reader's eye forward; the remaining words in that sentence are shown in a softer highlight color.
+- Words already spoken within the active sentence, and all words in completed sentences, fade to grey. Upcoming sentences are shown in the default text color. No background highlight is used — all state is conveyed through text color alone.
 - The system can recover if the user restarts a phrase or skips ahead in the script by realigning the transcript with the correct location in the text.
 
 ---
@@ -81,10 +82,7 @@ Audio is captured from the user's microphone through the browser and streamed to
 The provider must support word-level timing information so that words can be highlighted individually as they are recognized. As speech recognition events arrive, the transcript words are normalized and compared against a small window of script tokens surrounding the current position. For the prototype, the alignment system assumes the user is reading the script relatively closely — it attempts to match the newest transcript tokens with the expected upcoming tokens in the script.
 
 #### Alignment Engine
-The alignment engine determines the speaker's position within the script by comparing recognized transcript tokens with the script text. To maintain performance while still allowing recovery from small jumps or restarts, the system searches within a **limited matching window**. This window includes:
-- The current sentence
-- Several upcoming sentences
-- One or two previously completed sentences
+The alignment engine determines the speaker's position within the script by comparing recognized transcript tokens with the script text. All sentences are flattened into a single token array, and matching is performed within a **sliding window** around the current position. This window extends a fixed number of tokens backward (to allow for restarts) and a larger number of tokens forward (to allow for skipping ahead).
 
 #### Position Recovery
 - If the transcript strongly matches words **later** in the script, the system assumes the user skipped ahead and advances the teleprompter position accordingly.
