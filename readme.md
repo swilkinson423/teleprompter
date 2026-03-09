@@ -47,11 +47,9 @@ The client is built with **React 18** and **TypeScript**, bundled and served by 
 
 The backend is a **Node.js** server using **Express** and the **ws** library. It proxies audio frames from the client to **AssemblyAI** (Universal Streaming v3 API) and relays transcript events back to the browser, keeping API credentials secure on the server.
 
-### Script Parsing
+### Script Parsing & Tokenization
 
 The parser converts pasted text into a structured internal representation. Paragraphs are detected using blank lines as separators. These breaks are preserved so the interface can render visual paragraph spacing in the teleprompter. Each paragraph is divided into sentences using a sentence boundary detection library. Each sentence is treated as a single teleprompter line and is the primary display unit used by the interface.
-
-### Tokenization
 
 Each sentence is further divided into tokens representing words and punctuation. The system maintains two forms of tokens:
 
