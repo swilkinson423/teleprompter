@@ -108,18 +108,20 @@ Support for multiple languages, improved accent adaptation, and analytics about 
 
 ---
 
-## Development Setup
+## Implementation Details
 
 The prototype consists of a browser-based client application and a lightweight backend server that proxies audio streams to a speech-to-text provider.
 
 ### Client Application
-A React- and Vite-based web interface responsible for rendering the teleprompter, parsing scripts, capturing microphone audio, and aligning recognized words with the script.
+The client is built with **React 18** and **TypeScript**, bundled and served by **Vite**. React handles UI rendering and component state, while TypeScript provides type safety across the codebase. Vite acts as the development server and build tool, and also proxies WebSocket connections from the client to the backend.
 
-### Node.js Backend Server
-The backend is implemented using Node.js with Express and WebSockets, allowing microphone audio to be streamed to the speech recognition provider while keeping API credentials secure. Real-time highlighting requires low-latency streaming transcription, so audio must be transmitted continuously rather than uploaded in larger segments.
+Script text is split into sentences using the **sbd** (sentence boundary detection) library. Microphone audio is captured via the **Web Audio API** using an `AudioWorklet` that downsamples the input to 16-bit PCM at 16 kHz before streaming it over a WebSocket connection.
 
-### Speech Recognition Service
-Performs real-time transcription of the microphone audio and returns partial transcripts along with word-level timing information. These results drive the highlighting behavior in the teleprompter.
+### Backend Server
+The backend is a **Node.js** server using **Express** for HTTP and the **ws** library for WebSocket support. It acts as a proxy between the client and the speech recognition service, forwarding raw audio frames and relaying transcript events back to the browser. Keeping the server as intermediary ensures that API credentials are never exposed to the client.
+
+### Speech Recognition
+Real-time transcription is provided by **AssemblyAI** using their Universal Streaming v3 API (`wss://streaming.assemblyai.com/v3/ws`). Audio is transmitted continuously at 16 kHz and the service returns streaming transcript events with word-level timing and confidence data, which drive the word-by-word highlighting in the teleprompter.
 
 ---
 
