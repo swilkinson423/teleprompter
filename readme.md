@@ -1,10 +1,10 @@
 # Teleprompter Web App
 
+---
+
 ## Specification
 
 This project proposes a teleprompter web app that follows a script in real time by listening to the speaker through their microphone. As the user reads aloud, the application converts speech to text using a streaming speech recognition service and aligns the spoken words with the script displayed on screen.
-
----
 
 ### User Flow
 
@@ -17,8 +17,6 @@ This project proposes a teleprompter web app that follows a script in real time 
 7. Alignment engine determines the current script position.
 8. UI updates highlighting and scroll position.
 
----
-
 ### User Interface
 
 - The teleprompter keeps the current sentence slightly above the center of the screen to guide the reader.
@@ -27,14 +25,10 @@ This project proposes a teleprompter web app that follows a script in real time 
 - Words already spoken within the active sentence, and all words in completed sentences, fade to grey. Upcoming sentences are shown in the default text color. No background highlight is used — all state is conveyed through text color alone.
 - The system can recover if the user restarts a phrase or skips ahead in the script by realigning the transcript with the correct location in the text.
 
----
-
 ### Limitations
 
 - The system focuses on English speech recognition and aims to perform reliably for both American and British accents.
 - No user accounts, cloud storage, or script management features are included in the prototype phase.
-
----
 
 ### Security Concerns
 
@@ -45,48 +39,36 @@ This project proposes a teleprompter web app that follows a script in real time 
 
 ---
 
-## Script Parsing & Location Tracking
+## How It Works
 
-The interface highlights words as they are spoken, fades completed phrases, and keeps the current line centered in the viewing area. The goal is to create a natural reading experience where the teleprompter advances automatically based on what the speaker says rather than scrolling at a fixed speed.
+### Technologies
 
-The initial version is designed to demonstrate that speech-driven script alignment can reliably power a teleprompter interface.
+The client is built with **React 18** and **TypeScript**, bundled and served by **Vite**. Script text is split into sentences using the **sbd** (sentence boundary detection) library. Microphone audio is captured via the **Web Audio API** using an `AudioWorklet` that downsamples input to 16-bit PCM at 16 kHz.
+
+The backend is a **Node.js** server using **Express** and the **ws** library. It proxies audio frames from the client to **AssemblyAI** (Universal Streaming v3 API) and relays transcript events back to the browser, keeping API credentials secure on the server.
 
 ### Script Parsing
 
-The prototype converts text into a structured internal representation that the alignment system can track. The parser processes the script in three stages:
+The parser converts pasted text into a structured internal representation. Paragraphs are detected using blank lines as separators. These breaks are preserved so the interface can render visual paragraph spacing in the teleprompter. Each paragraph is divided into sentences using a sentence boundary detection library. Each sentence is treated as a single teleprompter line and is the primary display unit used by the interface.
 
-#### Paragraph Detection
-Paragraphs are detected using blank lines as separators. These breaks are preserved so the interface can render visual paragraph spacing in the teleprompter.
+### Tokenization
 
-#### Sentence Segmentation
-Each paragraph is divided into sentences using a sentence boundary detection library. Each sentence is treated as a single teleprompter line and is the primary display unit used by the interface.
-
-#### Tokenization
 Each sentence is further divided into tokens representing words and punctuation. The system maintains two forms of tokens:
 
 - **Display tokens** — The exact words shown in the interface.
-- **Normalized tokens** — Lowercase words stripped of punctuation, used for matching. The normalized tokens allow speech alignment to remain stable even when punctuation differs between the script and the transcript.
+- **Normalized tokens** — Lowercase words stripped of punctuation, used for matching. This keeps alignment stable even when punctuation differs between the script and the transcript.
 
-### Location Tracking
+### Audio Capture
 
-At any given moment the system maintains a **current location** in the script consisting of:
-- The current sentence index
-- The current word index within that sentence
+Audio is captured from the user's microphone through the browser and streamed to the backend over WebSocket. The backend forwards audio data to the speech provider and relays transcription results back to the client. AssemblyAI returns streaming transcript events with word-level timing and confidence data, which drive the highlighting.
 
-The prototype uses a streaming speech-to-text provider that processes audio in real time and returns partial transcripts as the user speaks. To determine where the speaker is in the script, the system compares recognized words with the script text in a small window surrounding the current reading position.
+### Alignment Engine
 
-#### Audio Capture
-Audio is captured from the user's microphone through the browser and streamed to a backend server over WebSocket. The backend server acts as a proxy that forwards audio data to the speech provider and relays transcription results back to the client.
-
-#### Word Recognition
-The provider must support word-level timing information so that words can be highlighted individually as they are recognized. As speech recognition events arrive, the transcript words are normalized and compared against a small window of script tokens surrounding the current position. For the prototype, the alignment system assumes the user is reading the script relatively closely — it attempts to match the newest transcript tokens with the expected upcoming tokens in the script.
-
-#### Alignment Engine
-The alignment engine determines the speaker's position within the script by comparing recognized transcript tokens with the script text. All sentences are flattened into a single token array, and matching is performed within a **sliding window** around the current position. This window extends a fixed number of tokens backward (to allow for restarts) and a larger number of tokens forward (to allow for skipping ahead).
+At any given moment the system maintains a **current position** in the script — a word index into a flat token array spanning all sentences. As transcript words arrive, they are normalized and matched against a **sliding window** around the current position. The window extends further forward than backward to favour natural forward progress while still allowing recovery from restarts.
 
 #### Position Recovery
-- If the transcript strongly matches words **later** in the script, the system assumes the user skipped ahead and advances the teleprompter position accordingly.
-- If the transcript instead matches words **earlier** in the same sentence, the system assumes the user restarted the phrase and rewinds the word highlighting to the appropriate position.
+- If the transcript strongly matches words **later** in the script, the system assumes the user skipped ahead and advances accordingly.
+- If the transcript matches words **earlier** in the current sentence, the system assumes the user restarted the phrase and rewinds the highlighting to the correct position.
 
 ---
 
@@ -103,23 +85,6 @@ The interface could evolve into a fully featured teleprompter tool with adjustab
 
 ### Language Improvements
 Support for multiple languages, improved accent adaptation, and analytics about reading performance.
-
----
-
-## Implementation Details
-
-The prototype consists of a browser-based client application and a lightweight backend server that proxies audio streams to a speech-to-text provider.
-
-### Client Application
-The client is built with **React 18** and **TypeScript**, bundled and served by **Vite**. React handles UI rendering and component state, while TypeScript provides type safety across the codebase. Vite acts as the development server and build tool, and also proxies WebSocket connections from the client to the backend.
-
-Script text is split into sentences using the **sbd** (sentence boundary detection) library. Microphone audio is captured via the **Web Audio API** using an `AudioWorklet` that downsamples the input to 16-bit PCM at 16 kHz before streaming it over a WebSocket connection.
-
-### Backend Server
-The backend is a **Node.js** server using **Express** for HTTP and the **ws** library for WebSocket support. It acts as a proxy between the client and the speech recognition service, forwarding raw audio frames and relaying transcript events back to the browser. Keeping the server as intermediary ensures that API credentials are never exposed to the client.
-
-### Speech Recognition
-Real-time transcription is provided by **AssemblyAI** using their Universal Streaming v3 API (`wss://streaming.assemblyai.com/v3/ws`). Audio is transmitted continuously at 16 kHz and the service returns streaming transcript events with word-level timing and confidence data, which drive the word-by-word highlighting in the teleprompter.
 
 ---
 
